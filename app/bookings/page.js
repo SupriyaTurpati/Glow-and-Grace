@@ -7,7 +7,7 @@ import { dataStore } from '@/lib/dataStore';
 import { BUSINESS_CONFIG } from '@/lib/config';
 import { 
   Calendar, Clock, MapPin, AlertCircle, Phone, 
-  CheckCircle2, XCircle, ArrowRight, RotateCcw 
+  CheckCircle2, XCircle, ArrowRight, RotateCcw, Bike 
 } from 'lucide-react';
 
 export default function BookingsHistoryPage() {
@@ -18,6 +18,15 @@ export default function BookingsHistoryPage() {
   useEffect(() => {
     setBookings(dataStore.getBookings());
     setLoading(false);
+
+    // Sync in background with live server
+    dataStore.syncWithServer().then(() => {
+      setBookings(dataStore.getBookings());
+    });
+
+    const onSynced = () => setBookings(dataStore.getBookings());
+    window.addEventListener('glow_grace_data_synced', onSynced);
+    return () => window.removeEventListener('glow_grace_data_synced', onSynced);
   }, []);
 
   const handleRequestCancellation = (id) => {
@@ -135,19 +144,41 @@ export default function BookingsHistoryPage() {
                     <strong className="text-stone-800">{isTelugu ? 'తేదీ:' : 'Date:'}</strong> {booking.event_date} ({booking.preferred_time})
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-henna-600 shrink-0" />
-                  <span className="truncate">
-                    <strong className="text-stone-800">{isTelugu ? 'చిరునామా:' : 'Location:'}</strong> {booking.service_location}
-                  </span>
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-henna-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="block text-stone-800 font-semibold">{isTelugu ? 'చిరునామా:' : 'Doorstep Address:'}</span>
+                    <span className="text-stone-600 leading-relaxed block">{booking.service_location}</span>
+                    {booking.landmark && (
+                      <span className="text-amber-800 text-[11px] font-medium block">
+                        {isTelugu ? 'దగ్గరి ప్రదేశం:' : 'Near:'} {booking.landmark}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 sm:justify-end">
-                  <span className="text-stone-500">{isTelugu ? 'మొత్తం ధర:' : 'Est. Cost:'}</span>
-                  <span className="font-serif text-base font-bold text-henna-800">
+                <div className="flex flex-col sm:items-end justify-center">
+                  <span className="text-stone-500">{isTelugu ? 'మొత్తం ధర:' : 'Total Cost:'}</span>
+                  <span className="font-serif text-lg font-bold text-henna-800">
                     ₹{booking.estimated_cost}
                   </span>
+                  {booking.service_cost && (
+                    <span className="text-[10px] text-stone-400">
+                      (Service ₹{booking.service_cost} + Travel ₹{booking.travel_charges || 0})
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {booking.distance_km && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950 font-medium">
+                  <Bike className="w-4 h-4 text-henna-700 shrink-0" />
+                  <span>
+                    {isTelugu 
+                      ? `రాపిడో ట్రావెల్ దూరం: ~${booking.distance_km} km (నాటయ్యపాలెం స్టూడియో నుండి) • ప్రయాణ ఛార్జీ: ₹${booking.travel_charges || 0}`
+                      : `Rapido Travel: ~${booking.distance_km} km from Natayyapalem Studio • Travel Charges: ₹${booking.travel_charges || 0}`}
+                  </span>
+                </div>
+              )}
 
               <div className="bg-stone-50 rounded-xl p-3 text-xs space-y-2 text-stone-700">
                 {booking.mehendi_design_name && (
@@ -155,6 +186,14 @@ export default function BookingsHistoryPage() {
                 )}
                 {booking.saree_style_name && (
                   <p>• <strong>{isTelugu ? 'శారీ స్టైల్:' : 'Saree Style:'}</strong> {booking.saree_style_name}</p>
+                )}
+                {booking.saree_delivery_type && (
+                  <p className="text-maroon-800 font-semibold">
+                    • {isTelugu ? 'శారీ డెలివరీ:' : 'Saree Delivery:'}{' '}
+                    {booking.saree_delivery_type === 'studio_drop' 
+                      ? (isTelugu ? '🏢 స్టూడియో వద్ద స్వంత డ్రాప్ & పికప్ (ఉచితం)' : '🏢 Self Studio Drop at Natayyapalem (FREE)')
+                      : (isTelugu ? '🛵 డోర్‌స్టెప్ పికప్ & డెలివరీ (పార్టనర్ ద్వారా)' : '🛵 Doorstep Pickup & Return by Partner')}
+                  </p>
                 )}
                 {booking.custom_design_photo && (
                   <div className="flex items-center gap-3 pt-1 border-t border-stone-200/60">

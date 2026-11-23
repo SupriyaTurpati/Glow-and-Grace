@@ -8,7 +8,8 @@ import {
   ShieldCheck, Calendar, CheckCircle2, XCircle, Clock, 
   DollarSign, Users, Phone, MapPin, Eye, Edit3, Trash2, 
   Plus, Globe, LogOut, Check, ChevronRight, X, Image as ImageIcon,
-  Camera, Upload, Sparkles, User, KeyRound, Lock
+  Camera, Upload, Sparkles, User, KeyRound, Lock,
+  RefreshCw, Smartphone, Download, UploadCloud, Bike
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
@@ -84,11 +85,60 @@ export default function AdminDashboardPage() {
     image_url: 'https://images.unsplash.com/photo-1610030469668-93510cb28665?auto=format&fit=crop&w=800&q=80'
   });
 
+  // Live Multi-Device Cloud Sync States
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced'
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [importCodeInput, setImportCodeInput] = useState('');
+  const [syncToast, setSyncToast] = useState('');
+
   const refreshAllData = () => {
     setBookings(dataStore.getBookings());
     setMehendiList(dataStore.getMehendiDesigns());
     setSareeList(dataStore.getSareeStyles());
     setGalleryList(dataStore.getGalleryItems());
+  };
+
+  const handleTriggerSync = async () => {
+    setSyncStatus('syncing');
+    const ok = await dataStore.syncWithServer();
+    if (ok) {
+      setSyncStatus('synced');
+      refreshAllData();
+      setSyncToast('Live server sync complete! Latest data pulled across devices.');
+    } else {
+      setSyncStatus('idle');
+      setSyncToast('Stored locally. Will re-sync when network allows.');
+    }
+    setTimeout(() => {
+      setSyncStatus('idle');
+      setSyncToast('');
+    }, 4000);
+  };
+
+  const handleCopyBackup = () => {
+    const code = dataStore.exportBackupString();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      alert('Cloud Sync Backup Code copied to clipboard!\n\nYou can now open this website on your second phone, click "Multi-Device Sync", and paste this code to transfer everything instantly!');
+    } else {
+      prompt('Copy your sync backup code below:', code);
+    }
+  };
+
+  const handleImportBackup = async () => {
+    if (!importCodeInput.trim()) {
+      alert('Please paste the backup code first.');
+      return;
+    }
+    const ok = await dataStore.importBackupString(importCodeInput.trim());
+    if (ok) {
+      refreshAllData();
+      alert('Success! All completed records, designs, and changes from your other phone are now applied and synced.');
+      setShowSyncModal(false);
+      setImportCodeInput('');
+    } else {
+      alert('Invalid backup code. Please ensure you copied the complete code and try again.');
+    }
   };
 
   useEffect(() => {
@@ -97,6 +147,15 @@ export default function AdminDashboardPage() {
       router.push('/admin/login');
     }
     refreshAllData();
+
+    // Auto-sync in background from server
+    dataStore.syncWithServer().then(() => {
+      refreshAllData();
+    });
+
+    const onSynced = () => refreshAllData();
+    window.addEventListener('glow_grace_data_synced', onSynced);
+    return () => window.removeEventListener('glow_grace_data_synced', onSynced);
   }, [router]);
 
   const handleLogout = () => {
@@ -332,6 +391,28 @@ export default function AdminDashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Multi-Device Cloud Sync Button */}
+          <button
+            onClick={() => setShowSyncModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 transition-colors shadow-sm"
+            title="Sync data between multiple phones"
+          >
+            <Smartphone className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Multi-Device Sync</span>
+            <span className="sm:hidden">Sync</span>
+          </button>
+
+          {/* Quick Refresh Sync Button */}
+          <button
+            onClick={handleTriggerSync}
+            disabled={syncStatus === 'syncing'}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-stone-300 hover:text-white hover:bg-stone-800 border border-stone-700 transition-colors"
+            title="Refresh and pull updates from live server"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-gold-400 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+            <span className="hidden md:inline">{syncStatus === 'syncing' ? 'Syncing...' : 'Live Sync'}</span>
+          </button>
+
           <button
             onClick={handleOpenSecurityModal}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gold-300 hover:text-white hover:bg-stone-800 transition-colors border border-stone-700 shadow-sm"
@@ -350,6 +431,13 @@ export default function AdminDashboardPage() {
           </button>
         </div>
       </div>
+
+      {syncToast && (
+        <div className="bg-emerald-600 text-white text-xs font-semibold py-2 px-4 text-center shadow-inner flex items-center justify-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{syncToast}</span>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
@@ -559,20 +647,37 @@ export default function AdminDashboardPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-stone-600">
                       <div>
-                        <p className="font-semibold text-stone-800">Customer Details (Private):</p>
+                        <p className="font-semibold text-stone-800">Customer &amp; Doorstep Address:</p>
                         <p>Phone: <strong>{booking.customer_phone}</strong></p>
-                        <p>Address: {booking.service_location}</p>
+                        <p className="mt-0.5 leading-relaxed">Address: {booking.service_location}</p>
+                        {booking.landmark && <p className="text-amber-800 font-medium">Near: {booking.landmark}</p>}
+                        {booking.distance_km && (
+                          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900">
+                            <Bike className="w-3.5 h-3.5 text-henna-700" />
+                            <span>Rapido: ~{booking.distance_km} km {booking.travel_charges !== undefined ? `(Travel: ₹${booking.travel_charges})` : ''}</span>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-stone-800">Schedule &amp; Time:</p>
                         <p>Date: {booking.event_date}</p>
                         <p>Time: {booking.preferred_time}</p>
+                        {booking.saree_delivery_type && (
+                          <p className="mt-1 text-[11px] font-semibold text-maroon-700">
+                            {booking.saree_delivery_type === 'studio_drop' ? '🏢 Self Studio Drop (Natayyapalem)' : '🛵 Partner Doorstep Pickup & Return'}
+                          </p>
+                        )}
                       </div>
                       <div>
-                        <p className="font-semibold text-stone-800">Service &amp; Amount:</p>
+                        <p className="font-semibold text-stone-800">Service &amp; Amount Breakdown:</p>
                         <p>{booking.mehendi_design_name || ''}</p>
                         <p>{booking.saree_style_name || ''}</p>
-                        <p className="font-bold text-henna-800 mt-1">Total: ₹{booking.estimated_cost}</p>
+                        <div className="mt-1 pt-1 border-t border-stone-100">
+                          {booking.service_cost && (
+                            <p className="text-[11px] text-stone-500">Service: ₹{booking.service_cost} | Travel: ₹{booking.travel_charges || 0}</p>
+                          )}
+                          <p className="font-bold text-henna-800 text-sm">Total: ₹{booking.estimated_cost}</p>
+                        </div>
                       </div>
                     </div>
 
@@ -1506,6 +1611,113 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MULTI-DEVICE CLOUD SYNC MODAL ================= */}
+      {showSyncModal && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shadow-sm">
+                  <Smartphone className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-stone-900">Multi-Device Live Sync</h3>
+                  <p className="text-xs text-stone-500">Sync completed records &amp; edits across your phones</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="p-1 rounded-full text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Live Server Sync */}
+            <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                    <span>Auto Server Sync</span>
+                  </p>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Pushes current records to live server and pulls updates from other devices.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTriggerSync}
+                  disabled={syncStatus === 'syncing'}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Live Server Now'}
+                </button>
+              </div>
+            </div>
+
+            {/* Method 2: One-Click Sync Code Transfer (100% Guaranteed Across Phones) */}
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+              <p className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <Download className="w-4 h-4 text-amber-800" />
+                <span>Instant 1-Tap Transfer Between 2 Phones</span>
+              </p>
+              <p className="text-[11px] text-stone-600 leading-relaxed">
+                If you made edits on your first phone, copy your sync code and paste it on your second phone to load all records instantly:
+              </p>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleCopyBackup}
+                  className="w-full py-2.5 px-4 bg-white border border-amber-300 hover:bg-amber-100/50 rounded-xl text-xs font-bold text-amber-950 flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <span>📋 1. Click to Copy Sync Code from this Phone</span>
+                </button>
+
+                <div className="pt-2 border-t border-amber-200/70 space-y-1.5">
+                  <label className="block text-[11px] font-bold text-stone-700">
+                    2. Paste Sync Code on your Other Phone:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={importCodeInput}
+                    onChange={(e) => setImportCodeInput(e.target.value)}
+                    placeholder="Paste copied sync code here on second phone..."
+                    className="w-full p-2.5 text-xs font-mono rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImportBackup}
+                    className="w-full py-2.5 bg-gradient-to-r from-henna-700 to-maroon-800 hover:from-henna-800 hover:to-maroon-900 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    📥 Apply &amp; Sync to this Phone
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Supabase Note */}
+            <div className="text-[11px] text-stone-500 bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-1">
+              <p className="font-semibold text-stone-700">☁️ Optional Vercel Supabase Postgres Integration:</p>
+              <p>
+                On your Vercel Dashboard under "Integrations", clicking <strong>Add Supabase</strong> automatically links a cloud PostgreSQL database without writing any code.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSyncModal(false)}
+                className="px-6 py-2 rounded-xl border border-stone-200 text-stone-700 text-xs font-semibold hover:bg-stone-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -22,13 +22,16 @@ export default function AdminLoginPage() {
       const enteredEmail = email.trim().toLowerCase();
       const targetEmail = (creds.email || 'admin@glowandgrace.com').toLowerCase();
 
-      // Check against custom saved credentials or default setup
+      // Check credentials strictly
       if (
-        (enteredEmail === targetEmail && password === creds.password) ||
-        (enteredEmail === 'admin@glowandgrace.com' && (password === 'admin123' || password === 'admin'))
+        (enteredEmail === 'supriyaturpati1117@gmail.com' && password === '8074541442') ||
+        (enteredEmail === targetEmail && password === creds.password)
       ) {
         sessionStorage.setItem('glow_grace_admin_auth', 'true');
-        router.push('/admin/dashboard');
+        // Trigger server sync to pull latest data
+        dataStore.syncWithServer().finally(() => {
+          router.push('/admin/dashboard');
+        });
       } else {
         setErrorMsg('Invalid administrator email or password.');
         setLoading(false);

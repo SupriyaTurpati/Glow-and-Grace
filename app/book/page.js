@@ -1,13 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
 import { dataStore } from '@/lib/dataStore';
 import { BUSINESS_CONFIG } from '@/lib/config';
 import { 
+  STUDIO_LOCATION, 
+  VIZAG_AREAS, 
+  calculateGpsDistanceKm, 
+  getDistanceByLocation, 
+  calculateMehendiTravelFare, 
+  calculateSareeDeliveryFare 
+} from '@/lib/travelCalculator';
+import { 
   Sparkles, Calendar, Clock, MapPin, User, Phone, 
-  CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Upload, Image as ImageIcon 
+  CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, 
+  Upload, Navigation, Bike, Compass, Home, Map, Info
 } from 'lucide-react';
 
 function BookingWizardContent() {
@@ -19,8 +28,13 @@ function BookingWizardContent() {
   const [sareeList, setSareeList] = useState([]);
 
   useEffect(() => {
+    // Initial load and background sync
     setMehendiList(dataStore.getMehendiDesigns());
     setSareeList(dataStore.getSareeStyles());
+    dataStore.syncWithServer().then(() => {
+      setMehendiList(dataStore.getMehendiDesigns());
+      setSareeList(dataStore.getSareeStyles());
+    });
   }, []);
 
   const initialService = searchParams.get('service') || 'both';
@@ -32,6 +46,9 @@ function BookingWizardContent() {
   const [selectedMehendiId, setSelectedMehendiId] = useState('');
   const [selectedSareeId, setSelectedSareeId] = useState('');
   const [sareeCount, setSareeCount] = useState(1);
+
+  // Saree delivery mode: 'pickup_drop' (Partner 2-way doorstep) vs 'studio_drop' (Self Drop & Pickup at 32-2-171, Natayyapalem)
+  const [sareeDeliveryType, setSareeDeliveryType] = useState('pickup_drop');
 
   // Custom design photo & notes
   const [customDesignPhoto, setCustomDesignPhoto] = useState('');
@@ -48,15 +65,30 @@ function BookingWizardContent() {
     }
   }, [mehendiList, sareeList, initialItem, selectedMehendiId, selectedSareeId]);
 
+  // Customer & Event Info
   const [eventType, setEventType] = useState('Wedding / Pellikuthuru');
   const [eventDate, setEventDate] = useState('');
   const [preferredTime, setPreferredTime] = useState('10:00 AM');
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [cityArea, setCityArea] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
+  // Structured Doorstep Location in Visakhapatnam
+  const [houseNo, setHouseNo] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [selectedArea, setSelectedArea] = useState('Natayyapalem (Gajuwaka)');
+  const [customArea, setCustomArea] = useState('');
+  const [pincode, setPincode] = useState('530012');
+  const [city] = useState('Visakhapatnam');
+
+  // GPS / Rapido distance state
+  const [distanceKm, setDistanceKm] = useState(1.5);
+  const [isGpsLocating, setIsGpsLocating] = useState(false);
+  const [gpsSuccess, setGpsSuccess] = useState(false);
+  const [gpsError, setGpsError] = useState('');
+
+  // Submitting states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedBooking, setSubmittedBooking] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -64,7 +96,80 @@ function BookingWizardContent() {
   const currentMehendi = mehendiList.find((m) => m.id === selectedMehendiId) || mehendiList[0];
   const currentSaree = sareeList.find((s) => s.id === selectedSareeId) || sareeList[0];
 
-  const estimatedCost = React.useMemo(() => {
+  // When area changes, automatically calculate distance & update PIN
+  const handleAreaChange = (areaName) => {
+    setSelectedArea(areaName);
+    setGpsSuccess(false);
+    if (areaName === 'other') {
+      const dist = getDistanceByLocation(customArea, pincode);
+      setDistanceKm(dist);
+      return;
+    }
+    const match = VIZAG_AREAS.find(a => a.name === areaName);
+    if (match) {
+      setPincode(match.pincode);
+      setDistanceKm(match.distanceKm);
+    }
+  };
+
+  const handlePincodeChange = (newPin) => {
+    setPincode(newPin);
+    if (newPin.trim().length === 6) {
+      const match = VIZAG_AREAS.find(a => a.pincode === newPin.trim());
+      if (match) {
+        setSelectedArea(match.name);
+        setDistanceKm(match.distanceKm);
+      }
+    }
+  };
+
+  // GPS Geolocation Handler
+  const handleUseCurrentLocation = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsError(isTelugu ? 'మీ బ్రౌజర్‌లో GPS సపోర్ట్ లేదు.' : 'Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setIsGpsLocating(true);
+    setGpsError('');
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const dist = calculateGpsDistanceKm(latitude, longitude);
+        setDistanceKm(dist);
+        setIsGpsLocating(false);
+        setGpsSuccess(true);
+
+        // Try reverse finding the nearest area
+        let closest = VIZAG_AREAS[0];
+        let minDiff = 999;
+        VIZAG_AREAS.forEach(area => {
+          const diff = Math.abs(area.distanceKm - dist);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = area;
+          }
+        });
+        if (closest && minDiff <= 3.0) {
+          setSelectedArea(closest.name);
+          setPincode(closest.pincode);
+        }
+      },
+      (err) => {
+        setIsGpsLocating(false);
+        setGpsError(
+          isTelugu 
+            ? 'GPS అనుమతి లభించలేదు. దయచేసి క్రింది లిస్ట్ నుండి మీ ఏరియా ఎంచుకోండి.' 
+            : 'GPS permission denied or timed out. Please select your area below.'
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Fare calculations
+  const serviceCost = useMemo(() => {
     let total = 0;
     if (serviceType === 'mehendi' || serviceType === 'both') {
       total += currentMehendi ? Number(currentMehendi.price) : 0;
@@ -75,16 +180,47 @@ function BookingWizardContent() {
     return total;
   }, [serviceType, currentMehendi, currentSaree, sareeCount]);
 
+  const travelFare = useMemo(() => {
+    let fare = 0;
+    const isMehendiIncluded = serviceType === 'mehendi' || serviceType === 'both';
+    const isSareeIncluded = serviceType === 'saree' || serviceType === 'both';
+
+    if (isMehendiIncluded) {
+      // Home Mehendi doorstep travel charge (Rapido 2-wheeler rate from Natayyapalem)
+      fare += calculateMehendiTravelFare(distanceKm);
+    }
+
+    if (isSareeIncluded) {
+      if (sareeDeliveryType === 'pickup_drop') {
+        const sareeCharge = calculateSareeDeliveryFare(distanceKm);
+        if (isMehendiIncluded) {
+          // Discounted combo delivery charge if mehendi artist is already visiting
+          fare += Math.round(sareeCharge * 0.6 / 5) * 5;
+        } else {
+          fare += sareeCharge;
+        }
+      }
+      // If studio_drop -> ₹0
+    }
+
+    return fare;
+  }, [serviceType, distanceKm, sareeDeliveryType]);
+
+  const grandTotal = serviceCost + travelFare;
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!customerName.trim() || !phone.trim() || !eventDate || !address.trim()) {
-      setErrorMsg(isTelugu ? 'దయచేసి అన్ని అవసరమైన వివరాలు నమోదు చేయండి.' : 'Please fill in all required fields.');
+    if (!customerName.trim() || !phone.trim() || !eventDate || !houseNo.trim() || !streetName.trim() || !landmark.trim()) {
+      setErrorMsg(isTelugu ? 'దయచేసి మీ పేరు, ఫోన్ నంబర్, ఇల్లు నంబర్, స్ట్రీట్ మరియు ప్రముఖ ల్యాండ్‌మార్క్ వివరాలను నమోదు చేయండి.' : 'Please enter your name, phone, house no., street, and famous landmark.');
       return;
     }
 
     setIsSubmitting(true);
+
+    const effectiveArea = selectedArea === 'other' ? (customArea.trim() || 'Visakhapatnam Area') : selectedArea;
+    const fullServiceLocation = `${houseNo.trim()}, ${streetName.trim()}, Near ${landmark.trim()}, ${effectiveArea}, Visakhapatnam - ${pincode}`;
 
     const bookingPayload = {
       customer_name: customerName,
@@ -96,14 +232,24 @@ function BookingWizardContent() {
       saree_style_name: customDesignPhoto && serviceType === 'saree'
         ? `Custom Saree Style (Client Photo Attached) (${sareeCount} Sarees)`
         : (serviceType !== 'mehendi' && currentSaree ? `${isTelugu ? currentSaree.name_te : currentSaree.name_en} (${sareeCount} Sarees)` : null),
+      saree_delivery_type: serviceType !== 'mehendi' ? sareeDeliveryType : null,
       event_type: eventType,
       event_date: eventDate,
       preferred_time: preferredTime,
-      service_location: `${address}, ${cityArea}`,
+      house_no: houseNo.trim(),
+      street_name: streetName.trim(),
+      landmark: landmark.trim(),
+      area: effectiveArea,
+      pincode: pincode,
+      city: 'Visakhapatnam',
+      service_location: fullServiceLocation,
+      distance_km: distanceKm,
+      service_cost: serviceCost,
+      travel_charges: travelFare,
+      estimated_cost: grandTotal,
       additional_requirements: customDesignNotes 
         ? `${additionalNotes ? additionalNotes + ' | ' : ''}Client Custom Design Notes: ${customDesignNotes}` 
         : additionalNotes,
-      estimated_cost: estimatedCost,
       custom_design_photo: customDesignPhoto || null,
       is_custom_design: Boolean(customDesignPhoto),
     };
@@ -113,7 +259,7 @@ function BookingWizardContent() {
       setIsSubmitting(false);
       setSubmittedBooking(saved);
 
-      // Automatically format and launch WhatsApp message from customer to 7842308509
+      // Construct rich WhatsApp message with Rapido travel details
       const serviceSummary = bookingPayload.service_type === 'both'
         ? 'Mehendi & Saree Pre-Pleating Combo'
         : (bookingPayload.mehendi_design_name || bookingPayload.saree_style_name || 'Mehendi / Saree Service');
@@ -125,9 +271,21 @@ function BookingWizardContent() {
         `👤 *Customer Name:* ${saved.customer_name}\n` +
         `📞 *Customer Phone:* ${saved.customer_phone}\n` +
         `🌸 *Service:* ${serviceSummary}\n` +
-        `📅 *Event Date:* ${saved.event_date} at ${saved.preferred_time}\n` +
-        `📍 *Doorstep Location:* ${saved.service_location}\n` +
-        `💰 *Estimated Total:* ₹${saved.estimated_cost}\n` +
+        `📅 *Event Date:* ${saved.event_date} at ${saved.preferred_time}\n\n` +
+        `📍 *Doorstep Service Address:*\n` +
+        `• House/Door No: ${saved.house_no}\n` +
+        `• Street/Colony: ${saved.street_name}\n` +
+        `• Famous Landmark: ${saved.landmark}\n` +
+        `• Area & PIN: ${saved.area} - ${saved.pincode}\n` +
+        `• City: Visakhapatnam\n\n` +
+        `🛵 *Rapido Travel Details:*\n` +
+        `• Studio: 32-2-171, Natayyapalem, Gajuwaka (530012)\n` +
+        `• Route Distance: ~${saved.distance_km} km\n` +
+        (saved.saree_delivery_type ? `• Saree Delivery: ${saved.saree_delivery_type === 'studio_drop' ? '🏢 Self Studio Drop (FREE)' : '🛵 Doorstep Pickup & Delivery by Partner'}\n` : '') +
+        `💰 *Amount Breakdown:*\n` +
+        `• Service Charges: ₹${saved.service_cost}\n` +
+        `• Travelling Charges: ₹${saved.travel_charges}\n` +
+        `• *Total Estimated:* ₹${saved.estimated_cost}\n\n` +
         (saved.custom_design_photo ? `🎨 *Custom Design:* I have attached my custom design photo on the website!\n` : '') +
         (saved.additional_requirements ? `📝 *Special Notes:* ${saved.additional_requirements}\n` : '') +
         `\nPlease review and confirm my appointment. Thank you!`;
@@ -139,7 +297,7 @@ function BookingWizardContent() {
       } catch (e) {
         // Fallback handled in UI
       }
-    }, 500);
+    }, 400);
   };
 
   if (submittedBooking) {
@@ -154,9 +312,21 @@ function BookingWizardContent() {
       `👤 *Customer Name:* ${submittedBooking.customer_name}\n` +
       `📞 *Customer Phone:* ${submittedBooking.customer_phone}\n` +
       `🌸 *Service:* ${serviceSummary}\n` +
-      `📅 *Event Date:* ${submittedBooking.event_date} at ${submittedBooking.preferred_time}\n` +
-      `📍 *Doorstep Location:* ${submittedBooking.service_location}\n` +
-      `💰 *Estimated Total:* ₹${submittedBooking.estimated_cost}\n` +
+      `📅 *Event Date:* ${submittedBooking.event_date} at ${submittedBooking.preferred_time}\n\n` +
+      `📍 *Doorstep Service Address:*\n` +
+      `• House/Door No: ${submittedBooking.house_no}\n` +
+      `• Street/Colony: ${submittedBooking.street_name}\n` +
+      `• Famous Landmark: ${submittedBooking.landmark}\n` +
+      `• Area & PIN: ${submittedBooking.area} - ${submittedBooking.pincode}\n` +
+      `• City: Visakhapatnam\n\n` +
+      `🛵 *Rapido Travel Details:*\n` +
+      `• Studio: 32-2-171, Natayyapalem, Gajuwaka (530012)\n` +
+      `• Route Distance: ~${submittedBooking.distance_km} km\n` +
+      (submittedBooking.saree_delivery_type ? `• Saree Delivery: ${submittedBooking.saree_delivery_type === 'studio_drop' ? '🏢 Self Studio Drop (FREE)' : '🛵 Doorstep Pickup & Delivery by Partner'}\n` : '') +
+      `💰 *Amount Breakdown:*\n` +
+      `• Service Charges: ₹${submittedBooking.service_cost}\n` +
+      `• Travelling Charges: ₹${submittedBooking.travel_charges}\n` +
+      `• *Total Estimated:* ₹${submittedBooking.estimated_cost}\n\n` +
       (submittedBooking.custom_design_photo ? `🎨 *Custom Design:* I have attached my custom design photo on the website!\n` : '') +
       (submittedBooking.additional_requirements ? `📝 *Special Notes:* ${submittedBooking.additional_requirements}\n` : '') +
       `\nPlease review and confirm my appointment. Thank you!`;
@@ -165,7 +335,7 @@ function BookingWizardContent() {
 
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
           <CheckCircle2 className="w-10 h-10" />
         </div>
         <h1 className="font-serif text-3xl font-bold text-stone-900">
@@ -175,14 +345,18 @@ function BookingWizardContent() {
           {t('booking.successDesc', { id: submittedBooking.id })}
         </p>
 
-        <div className="p-6 bg-white rounded-2xl border border-stone-200 text-left space-y-3 text-sm">
+        <div className="p-6 bg-white rounded-2xl border border-stone-200 text-left space-y-3.5 text-sm shadow-sm">
           <div className="flex justify-between border-b pb-2">
             <span className="text-stone-500">{isTelugu ? 'బుకింగ్ ఐడి' : 'Booking Reference'}:</span>
-            <span className="font-bold text-henna-800">{submittedBooking.id}</span>
+            <span className="font-bold text-henna-800">#{submittedBooking.id}</span>
           </div>
           <div className="flex justify-between border-b pb-2">
             <span className="text-stone-500">{isTelugu ? 'కస్టమర్ పేరు' : 'Customer Name'}:</span>
             <span className="font-semibold text-stone-800">{submittedBooking.customer_name}</span>
+          </div>
+          <div className="flex justify-between border-b pb-2">
+            <span className="text-stone-500">{isTelugu ? 'సర్వీస్' : 'Service'}:</span>
+            <span className="font-semibold text-stone-800">{serviceSummary}</span>
           </div>
           {submittedBooking.custom_design_photo && (
             <div className="flex items-center justify-between border-b pb-2">
@@ -194,31 +368,53 @@ function BookingWizardContent() {
             <span className="text-stone-500">{isTelugu ? 'ఈవెంట్ తేదీ' : 'Event Date'}:</span>
             <span className="font-semibold text-stone-800">{submittedBooking.event_date} ({submittedBooking.preferred_time})</span>
           </div>
-          <div className="flex justify-between border-b pb-2">
-            <span className="text-stone-500">{isTelugu ? 'లొకేషన్' : 'Location'}:</span>
-            <span className="font-semibold text-stone-800">{submittedBooking.service_location}</span>
+          <div className="border-b pb-2 space-y-1">
+            <span className="text-stone-500 block">{isTelugu ? 'డోర్‌స్టెప్ చిరునామా' : 'Doorstep Address'}:</span>
+            <p className="font-medium text-stone-800 text-xs leading-relaxed bg-stone-50 p-2.5 rounded-lg border border-stone-200/70">
+              {submittedBooking.service_location}
+            </p>
           </div>
-          <div className="flex justify-between border-b pb-2">
-            <span className="text-stone-500">{isTelugu ? 'అంచనా మొత్తం' : 'Estimated Cost'}:</span>
-            <span className="font-bold text-emerald-700">₹{submittedBooking.estimated_cost}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-stone-500">{isTelugu ? 'స్థితి' : 'Current Status'}:</span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 uppercase">
-              {t('bookingStatus.pending')}
-            </span>
+
+          {/* Rapido Route & Travel Charge Details */}
+          <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 text-xs space-y-1.5 text-amber-950">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5">
+                <Bike className="w-4 h-4 text-henna-700" />
+                <span>{isTelugu ? 'రాపిడో తరహా ప్రయాణ వివరాలు' : 'Doorstep Travel Distance & Route'}</span>
+              </span>
+              <span className="bg-amber-200/80 px-2 py-0.5 rounded text-[11px] font-bold">
+                ~{submittedBooking.distance_km} km
+              </span>
+            </div>
+            <p className="text-[11px] text-stone-600">
+              {isTelugu 
+                ? 'స్టూడియో: 32-2-171, నాటయ్యపాలెం, గాజువాక నుండి మీ లొకేషన్ వరకు లెక్కించబడింది.' 
+                : 'Calculated from Studio at 32-2-171, Natayyapalem, Gajuwaka to your doorstep.'}
+            </p>
+            <div className="flex justify-between pt-1 border-t border-amber-200/60 font-medium">
+              <span>{isTelugu ? 'సర్వీస్ ధర:' : 'Service Cost:'}</span>
+              <span>₹{submittedBooking.service_cost}</span>
+            </div>
+            <div className="flex justify-between font-medium">
+              <span>{isTelugu ? 'ప్రయాణ ఛార్జీలు:' : 'Travelling Charges:'}</span>
+              <span>₹{submittedBooking.travel_charges}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-amber-300 font-bold text-sm text-henna-900">
+              <span>{isTelugu ? 'మొత్తం చెల్లించవలసినది:' : 'Grand Total:'}</span>
+              <span>₹{submittedBooking.estimated_cost}</span>
+            </div>
           </div>
         </div>
 
         <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 space-y-2">
           <p className="font-bold flex items-center justify-center gap-1.5 text-sm">
             <Phone className="w-4 h-4 text-emerald-700" />
-            <span>{isTelugu ? 'వాట్సాప్ నోటిఫికేషన్ సిద్ధంగా ఉంది' : 'WhatsApp Notification to 7842308509'}</span>
+            <span>{isTelugu ? 'వాట్సాప్ మెసేజ్ సిద్ధంగా ఉంది (7842308509)' : 'WhatsApp Notification to 7842308509'}</span>
           </p>
           <p>
             {isTelugu
-              ? 'మీ బుకింగ్ వివరాలు ఆటోమేటిక్‌గా మీ వాట్సాప్ ద్వారా మా నంబర్ 7842308509 కు పంపబడతాయి. ఒకవేళ వాట్సాప్ తెరవకపోతే క్రింది బటన్ క్లిక్ చేయండి.'
-              : 'Your appointment details are automatically sent from your WhatsApp to our business number 7842308509. If WhatsApp did not open automatically, click the button below.'}
+              ? 'మీ బుకింగ్ మరియు ప్రయాణ వివరాలు ఆటోమేటిక్‌గా మీ వాట్సాప్ ద్వారా మా నంబర్ 7842308509 కు పంపబడతాయి. క్రింది బటన్ క్లిక్ చేసి నిర్ధారించండి.'
+              : 'Your appointment and Rapido travel breakdown are prepared for WhatsApp dispatch to our team at 7842308509. Click below to verify!'}
           </p>
         </div>
 
@@ -254,6 +450,10 @@ function BookingWizardContent() {
         <p className="text-stone-600 text-sm">
           {t('booking.subtitle')}
         </p>
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-stone-100 rounded-full text-xs text-stone-700 font-medium">
+          <MapPin className="w-3.5 h-3.5 text-henna-700" />
+          <span>{isTelugu ? 'విశాఖపట్నం అంతటా డోర్‌స్టెప్ సేవలు అందుబాటులో ఉన్నాయి' : 'Doorstep service across Visakhapatnam & nearby areas'}</span>
+        </div>
       </div>
 
       {errorMsg && (
@@ -283,7 +483,7 @@ function BookingWizardContent() {
               }`}
             >
               <p className="font-serif font-bold text-sm text-stone-900">{t('booking.mehendiOnly')}</p>
-              <p className="text-xs text-stone-500 mt-1">{isTelugu ? 'హెన్నా డిజైన్లు మాత్రమే' : 'Only Henna Design'}</p>
+              <p className="text-xs text-stone-500 mt-1">{isTelugu ? 'హెన్నా డిజైన్లు మాత్రమే' : 'Doorstep Henna Art'}</p>
             </button>
 
             <button
@@ -296,7 +496,7 @@ function BookingWizardContent() {
               }`}
             >
               <p className="font-serif font-bold text-sm text-stone-900">{t('booking.sareeOnly')}</p>
-              <p className="text-xs text-stone-500 mt-1">{isTelugu ? 'శారీ ప్రీ-ప్లీటింగ్ మాత్రమే' : 'Only Saree Pleating'}</p>
+              <p className="text-xs text-stone-500 mt-1">{isTelugu ? 'శారీ ప్రీ-ప్లీటింగ్ మాత్రమే' : 'Saree Pleating & Box Fold'}</p>
             </button>
 
             <button
@@ -386,8 +586,67 @@ function BookingWizardContent() {
 
           </div>
 
+          {/* Saree Pickup & Delivery Options (When Saree is Selected) */}
+          {(serviceType === 'saree' || serviceType === 'both') && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                  <Bike className="w-4 h-4 text-maroon-700" />
+                  <span>{isTelugu ? 'శారీ సేకరణ మరియు డెలివరీ ఎంపిక:' : 'Saree Pickup & Delivery Option:'}</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSareeDeliveryType('pickup_drop')}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    sareeDeliveryType === 'pickup_drop'
+                      ? 'border-maroon-700 bg-white ring-1 ring-maroon-700 shadow-sm'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  <p className="font-bold text-xs text-stone-900 flex items-center justify-between">
+                    <span>{isTelugu ? '🛵 గ్లో & గ్రేస్ డోర్‌స్టెప్ పికప్ & డెలివరీ' : '🛵 Doorstep Pickup & Delivery by Partner'}</span>
+                  </p>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {isTelugu 
+                      ? 'మా పార్టనర్ మీ ఇంటి వద్ద చీర తీసుకుని, ప్రెస్ చేసి బాక్స్ ఫోల్డింగ్ తో మీకే తిరిగి అందిస్తారు.' 
+                      : 'Partner collects saree from your home, presses/pleats, and safely returns it ready to wear.'}
+                  </p>
+                  <span className="inline-block mt-2 text-[10px] font-bold text-maroon-800 bg-maroon-50 px-2 py-0.5 rounded">
+                    {isTelugu ? 'రాపిడో తరహా ప్రయాణ ఛార్జీ వర్తిస్తుంది' : 'Rapido bike charges apply based on distance'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSareeDeliveryType('studio_drop')}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    sareeDeliveryType === 'studio_drop'
+                      ? 'border-emerald-700 bg-white ring-1 ring-emerald-700 shadow-sm'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  <p className="font-bold text-xs text-stone-900 flex items-center justify-between">
+                    <span>{isTelugu ? '🏢 స్టూడియో వద్ద స్వంత డ్రాప్ & పికప్' : '🏢 Self Drop & Pickup at Studio'}</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">₹0 FREE</span>
+                  </p>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {isTelugu 
+                      ? 'మా స్టూడియో (32-2-171, నాటయ్యపాలెం, గాజువాక) వద్ద మీరు స్వయంగా అందజేసి తీసుకోవచ్చు.' 
+                      : 'You hand over & collect at our Studio: 32-2-171, Natayyapalem, Gajuwaka.'}
+                  </p>
+                  <span className="inline-block mt-2 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                    {isTelugu ? 'ప్రయాణ ఛార్జీలు లేవు (ఉచితం)' : 'Zero Travel Charges (Free)'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Customer's Own Custom Design Upload Section */}
-          <div className="pt-4 border-t border-stone-100">
+          <div className="pt-2 border-t border-stone-100">
             <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/80 to-stone-50 border border-amber-200/80 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -398,7 +657,7 @@ function BookingWizardContent() {
                   <p className="text-xs text-stone-600 mt-1 font-medium">
                     {isTelugu 
                       ? 'మా కేటలాగ్‌లో లేని మీ స్వంత ప్రత్యేక డిజైన్ లేదా Pinterest / Instagram రిఫరెన్స్ ఫోటో ఉంటే ఇక్కడ అప్‌లోడ్ చేయండి.' 
-                      : 'Prefer your own design from Instagram, Pinterest, or your camera gallery? Upload your reference photo here!'}
+                      : 'Prefer your own design from Instagram, Pinterest, or camera roll? Upload your reference photo here!'}
                   </p>
                 </div>
                 {customDesignPhoto && (
@@ -480,12 +739,17 @@ function BookingWizardContent() {
 
         </div>
 
-        {/* Step 2: Event & Doorstep Details */}
+        {/* Step 2: Doorstep Location & Event Details */}
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-henna-100 shadow-sm space-y-6">
-          <h2 className="font-serif text-xl font-bold text-stone-900 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-henna-700 text-white text-xs flex items-center justify-center">2</span>
-            <span>{t('booking.step2')}</span>
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-4">
+            <h2 className="font-serif text-xl font-bold text-stone-900 flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-henna-700 text-white text-xs flex items-center justify-center">2</span>
+              <span>{t('booking.step2')}</span>
+            </h2>
+            <span className="text-xs text-stone-500">
+              {isTelugu ? 'మీ ఇంటి వద్దకే మా సర్వీస్' : 'Doorstep Service at Your Residence / Venue'}
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             
@@ -561,35 +825,201 @@ function BookingWizardContent() {
               </div>
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <label className="block text-xs font-semibold text-stone-700">
-                {t('booking.address')} *
-              </label>
-              <input
-                type="text"
-                required
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Flat / House No., Landmark, Apartment or Venue name"
-                className="w-full p-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
-              />
+          </div>
+
+          {/* Rapido-Style Location Collection for Visakhapatnam */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-stone-50 to-amber-50/30 border border-stone-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-stone-900 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-henna-700" />
+                  <span>{isTelugu ? 'డోర్‌స్టెప్ సర్వీస్ చిరునామా (విశాఖపట్నం)' : 'Doorstep Service Address (Visakhapatnam)'}</span>
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {isTelugu ? 'మా నాటయ్యపాలెం స్టూడియో నుండి ఖచ్చితమైన ప్రయాణ ఛార్జీ లెక్కించడానికి పూర్తి వివరాలు నమోదు చేయండి.' : 'Enter full address details to calculate accurate Rapido-style travel fare from our Natayyapalem studio.'}
+                </p>
+              </div>
+
+              {/* GPS Button */}
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isGpsLocating}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-henna-50 border border-stone-300 hover:border-henna-400 text-stone-800 text-xs font-bold transition-all shadow-sm shrink-0"
+              >
+                <Navigation className={`w-3.5 h-3.5 text-henna-700 ${isGpsLocating ? 'animate-spin' : ''}`} />
+                <span>{isGpsLocating ? (isTelugu ? 'లొకేషన్ శోధిస్తోంది...' : 'Locating GPS...') : (isTelugu ? '📍 నా ప్రస్తుత లొకేషన్ ఉపయోగించు' : '📍 Use My Current Location')}</span>
+              </button>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-stone-700">
-                {t('booking.cityArea')} *
-              </label>
-              <input
-                type="text"
-                required
-                value={cityArea}
-                onChange={(e) => setCityArea(e.target.value)}
-                placeholder="e.g. Visakhapatnam, MVP Colony, Gajuwaka"
-                className="w-full p-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
-              />
+            {gpsSuccess && (
+              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{isTelugu ? `GPS విజయవంతంగా గుర్తించబడింది! స్టూడియో నుండి దూరం: ~${distanceKm} km` : `GPS location detected successfully! Distance from Natayyapalem Studio: ~${distanceKm} km`}</span>
+              </div>
+            )}
+
+            {gpsError && (
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+                <Info className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>{gpsError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'ఇల్లు / ఫ్లాట్ / డోర్ నంబర్ *' : 'House / Flat / Door Number *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={houseNo}
+                  onChange={(e) => setHouseNo(e.target.value)}
+                  placeholder="e.g. D.No 32-2-171, Flat 302, Sri Nilayam"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'స్ట్రీట్ / కాలనీ / రోడ్ *' : 'Street / Colony / Road *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={streetName}
+                  onChange={(e) => setStreetName(e.target.value)}
+                  placeholder="e.g. Old Transformer Street, Natayyapalem"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'ప్రముఖ ల్యాండ్‌మార్క్ (దగ్గరి ప్రదేశం) *' : 'Famous Landmark / Near Location *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={landmark}
+                  onChange={(e) => setLandmark(e.target.value)}
+                  placeholder="e.g. Near Raghu Kirana Store, Opposite Water Tank"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'విశాఖపట్నం ఏరియా ఎంచుకోండి *' : 'Select Visakhapatnam Area *'}
+                </label>
+                <select
+                  value={selectedArea}
+                  onChange={(e) => handleAreaChange(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                >
+                  {VIZAG_AREAS.map((area) => (
+                    <option key={area.name} value={area.name}>
+                      {area.name} ({area.pincode}) — ~{area.distanceKm} km
+                    </option>
+                  ))}
+                  <option value="other">{isTelugu ? 'ఇతర ఏరియా / పరిసర గ్రామం' : 'Other Area / Nearby Town'}</option>
+                </select>
+              </div>
+
+              {selectedArea === 'other' && (
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-xs font-semibold text-stone-700">
+                    {isTelugu ? 'మీ ఏరియా పేరు నమోదు చేయండి:' : 'Specify Your Area Name:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={customArea}
+                    onChange={(e) => {
+                      setCustomArea(e.target.value);
+                      const dist = getDistanceByLocation(e.target.value, pincode);
+                      setDistanceKm(dist);
+                    }}
+                    placeholder="e.g. Pendurthi, Chodavaram, Tagarapuvalasa"
+                    className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'పిన్ కోడ్ (PIN Code) *' : 'PIN Code *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={pincode}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  placeholder="530012"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  {isTelugu ? 'నగరం' : 'City'}
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={city}
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm bg-stone-100 text-stone-500 font-medium"
+                />
+              </div>
+
             </div>
 
-            <div className="space-y-1.5">
+            {/* Live Rapido Travel Charges Calculator Card */}
+            <div className="mt-3 p-4 rounded-xl bg-white border border-amber-300 shadow-sm space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <Bike className="w-4 h-4 text-henna-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                      <span>{isTelugu ? 'రాపిడో తరహా ప్రయాణ ఛార్జీ లెక్కింపు' : 'Rapido-Style Travelling Fare'}</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                        {distanceKm} km
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-stone-500">
+                      {isTelugu 
+                        ? '32-2-171, నాటయ్యపాలెం స్టూడియో నుండి మీ లొకేషన్‌కు' 
+                        : 'From 32-2-171, Natayyapalem Studio to your doorstep'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[11px] text-stone-500 block">{isTelugu ? 'ప్రయాణ ఛార్జీ:' : 'Travel Fee:'}</span>
+                  <span className="text-base font-bold text-henna-800">
+                    {travelFare === 0 ? (
+                      <span className="text-emerald-700">₹0 (FREE)</span>
+                    ) : (
+                      `₹${travelFare}`
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-stone-500 leading-relaxed">
+                {serviceType === 'saree' && sareeDeliveryType === 'studio_drop'
+                  ? (isTelugu ? 'మీరు స్టూడియో డ్రాప్ & పికప్ ఎంచుకున్నారు కాబట్టి ప్రయాణ ఛార్జీలు ఉచితం (₹0).' : 'You selected self studio drop & pickup at Natayyapalem. Travel charges are ₹0.')
+                  : (isTelugu 
+                      ? 'నాటయ్యపాలెం/గాజువాక స్థానిక పరిధి (2.5 km వరకు) కేవలం ₹30-35. ఆ తర్వాత కిలోమీటరుకు ₹12 బైక్ టాక్సీ ఛార్జ్ మాత్రమే వర్తిస్తుంది.' 
+                      : 'Local Natayyapalem/Gajuwaka visit (up to 2.5km) is just ₹30-35. Beyond that, bike transit is ₹12/km.')}
+              </p>
+            </div>
+
+            <div className="space-y-1 pt-2">
               <label className="block text-xs font-semibold text-stone-700">
                 {t('booking.specialRequests')}
               </label>
@@ -597,8 +1027,8 @@ function BookingWizardContent() {
                 type="text"
                 value={additionalNotes}
                 onChange={(e) => setAdditionalNotes(e.target.value)}
-                placeholder="e.g. Need darker stain for bridal photos, specific color preference"
-                className="w-full p-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
+                placeholder={isTelugu ? 'ఉదా: పెళ్లికూతురు ఫోటోల కోసం డార్క్ కలర్ అవసరం, టైమింగ్ సూచనలు' : 'e.g. Need darker stain for bridal photos, specific time preference'}
+                className="w-full p-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-white"
               />
             </div>
 
@@ -608,14 +1038,19 @@ function BookingWizardContent() {
 
         {/* Step 3: Estimated Cost Summary & Submit */}
         <div className="bg-gradient-to-r from-stone-900 to-henna-950 p-6 sm:p-8 rounded-2xl text-white shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-700 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-stone-700 pb-6">
             <div>
               <p className="text-xs uppercase tracking-wider text-gold-400 font-semibold">
                 {t('booking.estimatedCost')}
               </p>
-              <p className="font-serif text-3xl sm:text-4xl font-bold text-white mt-1">
-                ₹{estimatedCost}
-              </p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-serif text-3xl sm:text-4xl font-bold text-white">
+                  ₹{grandTotal}
+                </span>
+                <span className="text-xs text-stone-400">
+                  (Service ₹{serviceCost} + Travel ₹{travelFare})
+                </span>
+              </div>
             </div>
             <div className="text-xs text-stone-300 max-w-sm sm:text-right">
               <p className="text-emerald-400 font-semibold mb-1 flex items-center sm:justify-end gap-1">
