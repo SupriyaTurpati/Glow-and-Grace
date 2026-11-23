@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
+import { dataStore } from '@/lib/dataStore';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@glowandgrace.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,16 +17,23 @@ export default function AdminLoginPage() {
     setErrorMsg('');
     setLoading(true);
 
-    // Initial administrator credential verification
     setTimeout(() => {
-      if (email === 'admin@glowandgrace.com' && (password === 'admin123' || password === 'admin')) {
+      const creds = dataStore.getAdminCredentials();
+      const enteredEmail = email.trim().toLowerCase();
+      const targetEmail = (creds.email || 'admin@glowandgrace.com').toLowerCase();
+
+      // Check against custom saved credentials or default setup
+      if (
+        (enteredEmail === targetEmail && password === creds.password) ||
+        (enteredEmail === 'admin@glowandgrace.com' && (password === 'admin123' || password === 'admin'))
+      ) {
         sessionStorage.setItem('glow_grace_admin_auth', 'true');
         router.push('/admin/dashboard');
       } else {
-        setErrorMsg('Invalid administrator credentials. (Default demo pass: admin123)');
+        setErrorMsg('Invalid administrator email or password.');
         setLoading(false);
       }
-    }, 500);
+    }, 400);
   };
 
   return (
@@ -63,6 +71,7 @@ export default function AdminLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter admin email address"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
               />
             </div>
@@ -79,7 +88,7 @@ export default function AdminLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password (default: admin123)"
+                placeholder="Enter your admin password"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
               />
             </div>
@@ -94,10 +103,6 @@ export default function AdminLoginPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-[11px] text-stone-500 text-center">
-          Demo Admin Credentials: <strong className="text-stone-700">admin@glowandgrace.com</strong> / <strong className="text-stone-700">admin123</strong>
-        </div>
 
       </div>
     </div>

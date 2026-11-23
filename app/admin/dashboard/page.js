@@ -8,7 +8,7 @@ import {
   ShieldCheck, Calendar, CheckCircle2, XCircle, Clock, 
   DollarSign, Users, Phone, MapPin, Eye, Edit3, Trash2, 
   Plus, Globe, LogOut, Check, ChevronRight, X, Image as ImageIcon,
-  Camera, Upload, Sparkles, User
+  Camera, Upload, Sparkles, User, KeyRound, Lock
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
@@ -102,6 +102,53 @@ export default function AdminDashboardPage() {
   const handleLogout = () => {
     sessionStorage.removeItem('glow_grace_admin_auth');
     router.push('/admin/login');
+  };
+
+  // Security & Credentials Modal States
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [securitySuccessMsg, setSecuritySuccessMsg] = useState('');
+  const [securityErrorMsg, setSecurityErrorMsg] = useState('');
+
+  const handleOpenSecurityModal = () => {
+    const creds = dataStore.getAdminCredentials();
+    setNewAdminEmail(creds.email || 'admin@glowandgrace.com');
+    setNewAdminPassword('');
+    setConfirmAdminPassword('');
+    setSecurityErrorMsg('');
+    setSecuritySuccessMsg('');
+    setShowSecurityModal(true);
+  };
+
+  const handleSaveSecurity = (e) => {
+    e.preventDefault();
+    setSecurityErrorMsg('');
+    setSecuritySuccessMsg('');
+
+    if (!newAdminEmail.trim()) {
+      setSecurityErrorMsg('Admin email cannot be empty.');
+      return;
+    }
+    if (!newAdminPassword) {
+      setSecurityErrorMsg('Please enter a new password.');
+      return;
+    }
+    if (newAdminPassword.length < 4) {
+      setSecurityErrorMsg('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newAdminPassword !== confirmAdminPassword) {
+      setSecurityErrorMsg('Passwords do not match.');
+      return;
+    }
+
+    dataStore.setAdminCredentials(newAdminEmail.trim(), newAdminPassword);
+    setSecuritySuccessMsg('Credentials updated! You can now log in with your new email and password.');
+    setTimeout(() => {
+      setShowSecurityModal(false);
+    }, 2200);
   };
 
   // Helper: Convert File to Base64
@@ -284,13 +331,24 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenSecurityModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gold-300 hover:text-white hover:bg-stone-800 transition-colors border border-stone-700 shadow-sm"
+            title="Update admin email and password"
+          >
+            <KeyRound className="w-4 h-4 text-gold-400" />
+            <span className="hidden sm:inline">Change Password</span>
+            <span className="sm:hidden">Password</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -497,6 +555,34 @@ export default function AdminDashboardPage() {
                       <p className="text-xs bg-stone-50 p-2.5 rounded-xl border border-stone-100 text-stone-600 italic">
                         Notes: "{booking.additional_requirements}"
                       </p>
+                    )}
+
+                    {/* Customer Custom Design Photo */}
+                    {booking.custom_design_photo && (
+                      <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={booking.custom_design_photo} 
+                            alt="Customer custom design" 
+                            className="w-14 h-14 rounded-lg object-cover border border-amber-300 shadow-sm cursor-pointer hover:opacity-90 shrink-0"
+                            onClick={() => window.open(booking.custom_design_photo, '_blank')}
+                          />
+                          <div>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-full">
+                              <Sparkles className="w-3 h-3 text-amber-700" />
+                              <span>Customer Custom Design Uploaded</span>
+                            </span>
+                            <p className="text-xs text-stone-600 mt-1">Customer provided their own design reference image. Click photo to open full size.</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => window.open(booking.custom_design_photo, '_blank')}
+                          className="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 transition-colors shadow-sm whitespace-nowrap self-start sm:self-auto"
+                        >
+                          View Design Photo
+                        </button>
+                      </div>
                     )}
 
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-stone-100">
@@ -1301,6 +1387,97 @@ export default function AdminDashboardPage() {
                   className="px-6 py-2 rounded-xl bg-amber-700 text-white font-semibold hover:bg-amber-800"
                 >
                   Add to Gallery
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= SECURITY & CREDENTIALS MODAL ================= */}
+      {showSecurityModal && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-stone-200">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-henna-700 to-maroon-800 text-gold-300 flex items-center justify-center shadow">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-stone-900">Administrator Security</h3>
+                  <p className="text-xs text-stone-500">Change your login email and password</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSecurityModal(false)}
+                className="p-1 rounded-full text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {securityErrorMsg && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                {securityErrorMsg}
+              </div>
+            )}
+
+            {securitySuccessMsg && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+                ✓ {securitySuccessMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSecurity} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-stone-700">Admin Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="e.g. yourname@gmail.com"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-stone-700">New Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  placeholder="Enter new strong password"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-stone-700">Confirm New Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={confirmAdminPassword}
+                  onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSecurityModal(false)}
+                  className="px-4 py-2 rounded-xl border text-stone-600 hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-henna-700 to-maroon-800 text-white font-semibold hover:from-henna-800 hover:to-maroon-900 shadow-sm"
+                >
+                  Save New Credentials
                 </button>
               </div>
             </form>

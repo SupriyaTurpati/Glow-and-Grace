@@ -7,7 +7,7 @@ import { dataStore } from '@/lib/dataStore';
 import { BUSINESS_CONFIG } from '@/lib/config';
 import { 
   Sparkles, Calendar, Clock, MapPin, User, Phone, 
-  CheckCircle2, AlertCircle, ArrowRight, ShieldCheck 
+  CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Upload, Image as ImageIcon 
 } from 'lucide-react';
 
 function BookingWizardContent() {
@@ -32,6 +32,10 @@ function BookingWizardContent() {
   const [selectedMehendiId, setSelectedMehendiId] = useState('');
   const [selectedSareeId, setSelectedSareeId] = useState('');
   const [sareeCount, setSareeCount] = useState(1);
+
+  // Custom design photo & notes
+  const [customDesignPhoto, setCustomDesignPhoto] = useState('');
+  const [customDesignNotes, setCustomDesignNotes] = useState('');
 
   useEffect(() => {
     if (mehendiList.length > 0 && !selectedMehendiId) {
@@ -86,14 +90,22 @@ function BookingWizardContent() {
       customer_name: customerName,
       customer_phone: phone,
       service_type: serviceType,
-      mehendi_design_name: serviceType !== 'saree' && currentMehendi ? (isTelugu ? currentMehendi.name_te : currentMehendi.name_en) : null,
-      saree_style_name: serviceType !== 'mehendi' && currentSaree ? `${isTelugu ? currentSaree.name_te : currentSaree.name_en} (${sareeCount} Sarees)` : null,
+      mehendi_design_name: customDesignPhoto && serviceType !== 'saree'
+        ? `Custom Design (Client Photo Attached)${currentMehendi ? ` [Ref: ${isTelugu ? currentMehendi.name_te : currentMehendi.name_en}]` : ''}`
+        : (serviceType !== 'saree' && currentMehendi ? (isTelugu ? currentMehendi.name_te : currentMehendi.name_en) : null),
+      saree_style_name: customDesignPhoto && serviceType === 'saree'
+        ? `Custom Saree Style (Client Photo Attached) (${sareeCount} Sarees)`
+        : (serviceType !== 'mehendi' && currentSaree ? `${isTelugu ? currentSaree.name_te : currentSaree.name_en} (${sareeCount} Sarees)` : null),
       event_type: eventType,
       event_date: eventDate,
       preferred_time: preferredTime,
       service_location: `${address}, ${cityArea}`,
-      additional_requirements: additionalNotes,
+      additional_requirements: customDesignNotes 
+        ? `${additionalNotes ? additionalNotes + ' | ' : ''}Client Custom Design Notes: ${customDesignNotes}` 
+        : additionalNotes,
       estimated_cost: estimatedCost,
+      custom_design_photo: customDesignPhoto || null,
+      is_custom_design: Boolean(customDesignPhoto),
     };
 
     setTimeout(() => {
@@ -125,6 +137,12 @@ function BookingWizardContent() {
             <span className="text-stone-500">{isTelugu ? 'కస్టమర్ పేరు' : 'Customer Name'}:</span>
             <span className="font-semibold text-stone-800">{submittedBooking.customer_name}</span>
           </div>
+          {submittedBooking.custom_design_photo && (
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-stone-500">{isTelugu ? 'మీ స్వంత డిజైన్ ఫోటో' : 'Your Custom Design Photo'}:</span>
+              <img src={submittedBooking.custom_design_photo} alt="Custom design reference" className="w-12 h-12 rounded-lg object-cover border border-amber-300 shadow-sm" />
+            </div>
+          )}
           <div className="flex justify-between border-b pb-2">
             <span className="text-stone-500">{isTelugu ? 'ఈవెంట్ తేదీ' : 'Event Date'}:</span>
             <span className="font-semibold text-stone-800">{submittedBooking.event_date} ({submittedBooking.preferred_time})</span>
@@ -305,6 +323,98 @@ function BookingWizardContent() {
               </div>
             )}
 
+          </div>
+
+          {/* Customer's Own Custom Design Upload Section */}
+          <div className="pt-4 border-t border-stone-100">
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/80 to-stone-50 border border-amber-200/80 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-full">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                    <span>{isTelugu ? 'స్వంత డిజైన్ ఫోటో జత చేయండి (ఐచ్ఛికం)' : 'Book With Your Own Custom Design (Optional)'}</span>
+                  </span>
+                  <p className="text-xs text-stone-600 mt-1 font-medium">
+                    {isTelugu 
+                      ? 'మా కేటలాగ్‌లో లేని మీ స్వంత ప్రత్యేక డిజైన్ లేదా Pinterest / Instagram రిఫరెన్స్ ఫోటో ఉంటే ఇక్కడ అప్‌లోడ్ చేయండి.' 
+                      : 'Prefer your own design from Instagram, Pinterest, or your camera gallery? Upload your reference photo here!'}
+                  </p>
+                </div>
+                {customDesignPhoto && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomDesignPhoto('');
+                      setCustomDesignNotes('');
+                    }}
+                    className="text-xs text-red-600 hover:underline font-semibold shrink-0"
+                  >
+                    {isTelugu ? 'తొలగించు' : 'Remove Photo'}
+                  </button>
+                )}
+              </div>
+
+              {customDesignPhoto ? (
+                <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-amber-300 shadow-sm">
+                  <img 
+                    src={customDesignPhoto} 
+                    alt="Custom design preview" 
+                    className="w-20 h-20 rounded-xl object-cover border border-amber-300 shadow-sm shrink-0"
+                  />
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{isTelugu ? 'మీ స్వంత డిజైన్ ఫోటో విజయవంతంగా జతచేయబడింది!' : 'Your Custom Design Photo Attached!'}</span>
+                    </p>
+                    <p className="text-[11px] text-stone-500">
+                      {isTelugu 
+                        ? 'ఈ డిజైన్ ఫోటో మీ బుకింగ్ అభ్యర్థనతో పాటు నేరుగా మా నిపుణులకు పంపబడుతుంది.' 
+                        : 'Our artist will review your uploaded design reference and cater specifically to this style.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-amber-300 rounded-xl bg-white hover:bg-amber-50/50 cursor-pointer transition-colors group">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Upload className="w-7 h-7 text-amber-700 group-hover:scale-110 transition-transform mb-1" />
+                    <p className="text-xs font-bold text-stone-800">
+                      {isTelugu ? 'మీ స్వంత డిజైన్ ఫోటోను అప్‌లోడ్ చేయడానికి క్లిక్ చేయండి' : 'Click to Upload Your Custom Design Photo'}
+                    </p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      {isTelugu ? 'మొబైల్ కెమెరా లేదా గ్యాలరీ ఫోటో (JPG, PNG, WEBP)' : 'Directly from Mobile Camera or Device Gallery (JPG, PNG)'}
+                    </p>
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setCustomDesignPhoto(reader.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }} 
+                  />
+                </label>
+              )}
+
+              {customDesignPhoto && (
+                <div className="space-y-1 pt-1">
+                  <label className="block text-[11px] font-semibold text-stone-700">
+                    {isTelugu ? 'డిజైన్ సూచనలు లేదా వివరణ (ఐచ్ఛికం):' : 'Design Instructions or Preferences (Optional):'}
+                  </label>
+                  <input
+                    type="text"
+                    value={customDesignNotes}
+                    onChange={(e) => setCustomDesignNotes(e.target.value)}
+                    placeholder={isTelugu ? 'ఉదా: ముందు చేతికి మాత్రమే, వెనుక భాగం సింపుల్ బెల్స్ డిజైన్' : 'e.g., Back hand only, delicate finger mesh, medium pallu width'}
+                    className="w-full p-2.5 rounded-lg border border-stone-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-henna-700"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
         </div>

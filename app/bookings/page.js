@@ -149,12 +149,29 @@ export default function BookingsHistoryPage() {
                 </div>
               </div>
 
-              <div className="bg-stone-50 rounded-xl p-3 text-xs space-y-1 text-stone-700">
+              <div className="bg-stone-50 rounded-xl p-3 text-xs space-y-2 text-stone-700">
                 {booking.mehendi_design_name && (
                   <p>• <strong>{isTelugu ? 'మెహందీ డిజైన్:' : 'Mehendi Design:'}</strong> {booking.mehendi_design_name}</p>
                 )}
                 {booking.saree_style_name && (
                   <p>• <strong>{isTelugu ? 'శారీ స్టైల్:' : 'Saree Style:'}</strong> {booking.saree_style_name}</p>
+                )}
+                {booking.custom_design_photo && (
+                  <div className="flex items-center gap-3 pt-1 border-t border-stone-200/60">
+                    <img 
+                      src={booking.custom_design_photo} 
+                      alt="Your custom design photo" 
+                      className="w-14 h-14 rounded-lg object-cover border border-amber-300 shadow-sm shrink-0" 
+                    />
+                    <div>
+                      <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full inline-block">
+                        {isTelugu ? '🎨 మీ స్వంత డిజైన్ ఫోటో జతచేయబడింది' : '🎨 Your Custom Design Photo Attached'}
+                      </span>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        {isTelugu ? 'ఆర్డర్ ఆధారంగా ఈ డిజైన్ తయారు చేయబడుతుంది.' : 'Service will be executed based on this design reference.'}
+                      </p>
+                    </div>
+                  </div>
                 )}
                 {booking.additional_requirements && (
                   <p className="text-stone-500 italic">Notes: "{booking.additional_requirements}"</p>
