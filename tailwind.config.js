@@ -1,0 +1,61 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
+    "./context/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        henna: {
+          50: '#FDF7F4',
+          100: '#F9ECE5',
+          200: '#F2D5C7',
+          300: '#E7B49F',
+          400: '#D7896C',
+          500: '#C26242',
+          600: '#A84B2E',
+          700: '#8A3B23',
+          800: '#6C2F1E',
+          900: '#522417',
+          950: '#2F120B',
+        },
+        maroon: {
+          50: '#FBF4F6',
+          100: '#F6E7EB',
+          200: '#ECD2D9',
+          300: '#DDB0BD',
+          400: '#C78398',
+          500: '#AE5B73',
+          600: '#8E4057',
+          700: '#753245',
+          800: '#5F2B39',
+          900: '#4E2632',
+          950: '#2F111B',
+        },
+        gold: {
+          50: '#FCFBF3',
+          100: '#F7F4E1',
+          200: '#EFE7BF',
+          300: '#E4D595',
+          400: '#D5BF6A',
+          500: '#C2A445',
+          600: '#A48434',
+          700: '#7D602A',
+          800: '#624B25',
+          900: '#4F3D21',
+          950: '#2D210F',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Noto Sans Telugu', 'sans-serif'],
+        serif: ['Playfair Display', 'Georgia', 'serif'],
+        telugu: ['Noto Sans Telugu', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+};

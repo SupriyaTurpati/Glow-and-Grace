@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+    --font-playfair: 'Playfair Display', serif;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #FAF8F5;
+    color: #2D2321;
+    font-family: var(--font-inter), 'Noto Sans Telugu', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-playfair), 'Noto Sans Telugu', serif;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4EBE6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C26242;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8A3B23;
+}
+
+/* Smooth Glow Card styles */
+.glow-card {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glow-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 30px -10px rgba(138, 59, 35, 0.15);
+}
+
+/* Telugu Typography fine-tuning */
+[lang="te"] {
+  line-height: 1.7;
+}
