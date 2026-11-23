@@ -12,8 +12,8 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState('Sravanthi Reddy');
   const [phoneNumber, setPhoneNumber] = useState('9876543210');
   const [emailAddress, setEmailAddress] = useState('sravanthi@example.com');
-  const [address, setAddress] = useState('Flat 402, Lotus Towers, Madhapur');
-  const [city, setCity] = useState('Hyderabad');
+  const [address, setAddress] = useState('Flat 402, Lotus Towers, MVP Colony');
+  const [city, setCity] = useState('Visakhapatnam');
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 

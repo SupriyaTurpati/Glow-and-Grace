@@ -353,6 +353,31 @@ export default function AdminDashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
+        {/* Real-time New Booking Alert Banner */}
+        {pendingCount > 0 && (
+          <div className="bg-gradient-to-r from-amber-600 via-henna-700 to-maroon-800 text-white p-4 sm:p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-amber-300/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-gold-300" />
+              </div>
+              <div>
+                <h3 className="font-serif text-base font-bold flex items-center gap-2">
+                  <span>🔔 New Customer Booking Request Received!</span>
+                </h3>
+                <p className="text-xs text-amber-100 mt-0.5">
+                  You have {pendingCount} new customer appointment request(s) awaiting your review and confirmation.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setActiveTab('bookings')} 
+              className="px-5 py-2.5 bg-white text-henna-950 rounded-xl text-xs font-bold hover:bg-gold-300 transition-colors whitespace-nowrap shadow"
+            >
+              Review Pending Bookings ({pendingCount})
+            </button>
+          </div>
+        )}
+
         {/* KPI Metrics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm space-y-1">

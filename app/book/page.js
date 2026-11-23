@@ -112,10 +112,57 @@ function BookingWizardContent() {
       const saved = dataStore.addBooking(bookingPayload);
       setIsSubmitting(false);
       setSubmittedBooking(saved);
+
+      // Automatically format and launch WhatsApp message from customer to 7842308509
+      const serviceSummary = bookingPayload.service_type === 'both'
+        ? 'Mehendi & Saree Pre-Pleating Combo'
+        : (bookingPayload.mehendi_design_name || bookingPayload.saree_style_name || 'Mehendi / Saree Service');
+
+      const waMsg = 
+        `Hello Glow & Grace! ✨\n\n` +
+        `I would like to book an appointment with you:\n` +
+        `📋 *Booking ID:* #${saved.id}\n` +
+        `👤 *Customer Name:* ${saved.customer_name}\n` +
+        `📞 *Customer Phone:* ${saved.customer_phone}\n` +
+        `🌸 *Service:* ${serviceSummary}\n` +
+        `📅 *Event Date:* ${saved.event_date} at ${saved.preferred_time}\n` +
+        `📍 *Doorstep Location:* ${saved.service_location}\n` +
+        `💰 *Estimated Total:* ₹${saved.estimated_cost}\n` +
+        (saved.custom_design_photo ? `🎨 *Custom Design:* I have attached my custom design photo on the website!\n` : '') +
+        (saved.additional_requirements ? `📝 *Special Notes:* ${saved.additional_requirements}\n` : '') +
+        `\nPlease review and confirm my appointment. Thank you!`;
+
+      const waUrl = `https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent(waMsg)}`;
+      
+      try {
+        window.open(waUrl, '_blank');
+      } catch (e) {
+        // Fallback handled in UI
+      }
     }, 500);
   };
 
   if (submittedBooking) {
+    const serviceSummary = submittedBooking.service_type === 'both'
+      ? 'Mehendi & Saree Pre-Pleating Combo'
+      : (submittedBooking.mehendi_design_name || submittedBooking.saree_style_name || 'Mehendi / Saree Service');
+
+    const confirmationWaMsg = 
+      `Hello Glow & Grace! ✨\n\n` +
+      `I would like to book an appointment with you:\n` +
+      `📋 *Booking ID:* #${submittedBooking.id}\n` +
+      `👤 *Customer Name:* ${submittedBooking.customer_name}\n` +
+      `📞 *Customer Phone:* ${submittedBooking.customer_phone}\n` +
+      `🌸 *Service:* ${serviceSummary}\n` +
+      `📅 *Event Date:* ${submittedBooking.event_date} at ${submittedBooking.preferred_time}\n` +
+      `📍 *Doorstep Location:* ${submittedBooking.service_location}\n` +
+      `💰 *Estimated Total:* ₹${submittedBooking.estimated_cost}\n` +
+      (submittedBooking.custom_design_photo ? `🎨 *Custom Design:* I have attached my custom design photo on the website!\n` : '') +
+      (submittedBooking.additional_requirements ? `📝 *Special Notes:* ${submittedBooking.additional_requirements}\n` : '') +
+      `\nPlease review and confirm my appointment. Thank you!`;
+
+    const confirmationWaUrl = `https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent(confirmationWaMsg)}`;
+
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
         <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
@@ -148,6 +195,10 @@ function BookingWizardContent() {
             <span className="font-semibold text-stone-800">{submittedBooking.event_date} ({submittedBooking.preferred_time})</span>
           </div>
           <div className="flex justify-between border-b pb-2">
+            <span className="text-stone-500">{isTelugu ? 'లొకేషన్' : 'Location'}:</span>
+            <span className="font-semibold text-stone-800">{submittedBooking.service_location}</span>
+          </div>
+          <div className="flex justify-between border-b pb-2">
             <span className="text-stone-500">{isTelugu ? 'అంచనా మొత్తం' : 'Estimated Cost'}:</span>
             <span className="font-bold text-emerald-700">₹{submittedBooking.estimated_cost}</span>
           </div>
@@ -159,24 +210,34 @@ function BookingWizardContent() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 space-y-2">
+          <p className="font-bold flex items-center justify-center gap-1.5 text-sm">
+            <Phone className="w-4 h-4 text-emerald-700" />
+            <span>{isTelugu ? 'వాట్సాప్ నోటిఫికేషన్ సిద్ధంగా ఉంది' : 'WhatsApp Notification to 7842308509'}</span>
+          </p>
+          <p>
+            {isTelugu
+              ? 'మీ బుకింగ్ వివరాలు ఆటోమేటిక్‌గా మీ వాట్సాప్ ద్వారా మా నంబర్ 7842308509 కు పంపబడతాయి. ఒకవేళ వాట్సాప్ తెరవకపోతే క్రింది బటన్ క్లిక్ చేయండి.'
+              : 'Your appointment details are automatically sent from your WhatsApp to our business number 7842308509. If WhatsApp did not open automatically, click the button below.'}
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          <a
+            href={confirmationWaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all inline-flex items-center justify-center gap-2"
+          >
+            <Phone className="w-4 h-4 text-white" />
+            <span>{isTelugu ? 'వాట్సాప్ మెసేజ్ పంపండి (7842308509)' : 'Send WhatsApp to 7842308509'}</span>
+          </a>
           <button
             onClick={() => router.push('/bookings')}
-            className="w-full sm:w-auto px-6 py-3 rounded-full bg-henna-700 text-white font-semibold text-sm hover:bg-henna-800 transition-colors"
+            className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold text-sm transition-colors"
           >
             {t('booking.viewBookingsBtn')}
           </button>
-          <a
-            href={`https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent(
-              `Hello! I just submitted booking request #${submittedBooking.id} on Glow & Grace for ${submittedBooking.event_date}.`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto px-6 py-3 rounded-full border border-stone-300 text-stone-800 font-semibold text-sm hover:bg-stone-50 transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <Phone className="w-4 h-4 text-emerald-600" />
-            <span>{t('hero.whatsappUs')}</span>
-          </a>
         </div>
       </div>
     );
@@ -523,7 +584,7 @@ function BookingWizardContent() {
                 required
                 value={cityArea}
                 onChange={(e) => setCityArea(e.target.value)}
-                placeholder="e.g. Hyderabad, Madhapur"
+                placeholder="e.g. Visakhapatnam, MVP Colony, Gajuwaka"
                 className="w-full p-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-henna-700 bg-stone-50/50"
               />
             </div>

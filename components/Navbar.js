@@ -108,15 +108,6 @@ export default function Navbar() {
               <span>{locale === 'en' ? 'తెలుగు' : 'English'}</span>
             </button>
 
-            {/* Profile / Account */}
-            <Link
-              href="/profile"
-              className="p-2 text-stone-600 hover:text-henna-800 rounded-full hover:bg-henna-50 transition-colors"
-              title="Customer Profile"
-            >
-              <User className="w-5 h-5" />
-            </Link>
-
             {/* Book Now Button */}
             <Link
               href="/book"
@@ -173,15 +164,7 @@ export default function Navbar() {
               <Calendar className="w-4 h-4 text-gold-300" />
               <span>{t('nav.bookNow')}</span>
             </Link>
-            <div className="flex justify-between items-center px-2 pt-2">
-              <Link
-                href="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-xs font-medium text-stone-600 hover:text-henna-800 inline-flex items-center gap-1"
-              >
-                <User className="w-4 h-4" />
-                <span>{t('nav.profile')}</span>
-              </Link>
+            <div className="flex justify-end items-center px-2 pt-2">
               <Link
                 href="/admin/dashboard"
                 onClick={() => setMobileMenuOpen(false)}

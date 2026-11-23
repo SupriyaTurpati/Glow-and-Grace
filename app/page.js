@@ -151,8 +151,8 @@ export default function HomePage() {
             <div>
               <div className="relative h-64 overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1610030469668-93510cb28665?auto=format&fit=crop&w=800&q=80"
-                  alt="Mehendi Designs"
+                  src="https://images.unsplash.com/photo-1598971861713-54ad16a7e72e?auto=format&fit=crop&w=800&q=80"
+                  alt="Mehendi Artistry"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-4 left-4 bg-henna-900/80 backdrop-blur-sm text-gold-300 text-xs font-semibold px-3 py-1 rounded-full">
@@ -176,16 +176,15 @@ export default function HomePage() {
             </div>
             
             <div className="p-8 pt-0 flex items-center justify-between border-t border-stone-100 mt-4">
-              <div>
-                <span className="text-xs text-stone-500 block">{t('services.fromPrice')}</span>
-                <span className="font-serif text-xl font-bold text-henna-800">₹799</span>
-              </div>
+              <span className="text-xs font-semibold text-henna-700">
+                {isTelugu ? 'డోర్‌స్టెప్ సర్వీస్ అందుబాటులో ఉంది' : 'Doorstep Service Available'}
+              </span>
               <Link
-                href="/mehendi"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-henna-700 hover:text-henna-900 group-hover:translate-x-1 transition-all"
+                href="/book?service=mehendi"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-henna-700 text-white text-xs font-semibold hover:bg-henna-800 transition-colors shadow-sm"
               >
-                <span>{t('services.viewCatalog')}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>{t('services.bookService')}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
@@ -219,100 +218,17 @@ export default function HomePage() {
             </div>
 
             <div className="p-8 pt-0 flex items-center justify-between border-t border-stone-100 mt-4">
-              <div>
-                <span className="text-xs text-stone-500 block">{t('services.fromPrice')}</span>
-                <span className="font-serif text-xl font-bold text-maroon-800">₹399</span>
-              </div>
+              <span className="text-xs font-semibold text-maroon-700">
+                {isTelugu ? 'బాక్స్ ఫోల్డింగ్ & ఐరన్ ప్రెస్' : 'Box Folding & Ready Draping'}
+              </span>
               <Link
-                href="/saree-pre-pleating"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-maroon-700 hover:text-maroon-900 group-hover:translate-x-1 transition-all"
+                href="/book?service=saree"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-maroon-700 text-white text-xs font-semibold hover:bg-maroon-800 transition-colors shadow-sm"
               >
-                <span>{t('services.viewCatalog')}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>{t('services.bookService')}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* POPULAR DESIGNS PREVIEW */}
-      <section className="bg-henna-50/50 py-20 border-y border-henna-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-henna-700">
-                {isTelugu ? 'ట్రెండింగ్ డిజైన్లు' : 'Customer Favorites'}
-              </span>
-              <h2 className="text-3xl font-serif font-bold text-stone-900 mt-1">
-                {isTelugu ? 'జనాదరణ పొందిన మెహందీ డిజైన్లు' : 'Popular Mehendi Designs'}
-              </h2>
-            </div>
-            <Link
-              href="/mehendi"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-henna-700 hover:text-henna-900"
-            >
-              <span>{isTelugu ? 'అన్ని డిజైన్లు చూడండి' : 'Browse All Designs'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredMehendi.map((item) => {
-              const title = isTelugu ? item.name_te : item.name_en;
-              const categoryLabel = isTelugu ? (item.category_label_te || item.category) : (item.category_label_en || item.category);
-
-              return (
-                <div 
-                  key={item.id} 
-                  className="bg-white rounded-2xl overflow-hidden border border-henna-100 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="relative h-60 overflow-hidden">
-                      <img 
-                        src={item.image_url} 
-                        alt={title}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
-                      />
-                      <div className="absolute top-3 right-3 bg-white/95 px-2.5 py-1 rounded-full text-xs font-bold text-henna-800 shadow">
-                        ₹{item.price}
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-2">
-                      <span className="text-[11px] font-semibold text-henna-600 uppercase tracking-wider">
-                        {categoryLabel}
-                      </span>
-                      <h3 className="font-serif text-lg font-bold text-stone-900">
-                        {title}
-                      </h3>
-                      <p className="text-xs text-stone-600 line-clamp-2">
-                        {isTelugu ? item.description_te : item.description_en}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-6 pt-0 space-y-2">
-                    <Link
-                      href={`/book?service=mehendi&item=${item.id}`}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-henna-50 border border-henna-200 text-henna-800 font-semibold text-xs hover:bg-henna-700 hover:text-white transition-all"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      <span>{t('common.bookNow')}</span>
-                    </Link>
-
-                    {/* SHARE BUTTON */}
-                    <ShareToWhatsAppButton
-                      title={title}
-                      price={item.price}
-                      category={categoryLabel}
-                      serviceType="Mehendi"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
         </div>

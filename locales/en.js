@@ -67,7 +67,7 @@ export const en = {
     customerName: "Your Full Name",
     phone: "Phone Number",
     address: "Doorstep Service Address",
-    cityArea: "City / Area (e.g., Hyderabad, Gachibowli)",
+    cityArea: "City / Area (e.g., Visakhapatnam, MVP Colony, Gajuwaka)",
     specialRequests: "Special Requests / Notes (optional)",
     estimatedCost: "Estimated Total Cost",
     paymentNote: "Payment is collected directly after service completion. No advance payment required.",

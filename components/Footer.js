@@ -29,22 +29,14 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-3 pt-2">
               <a 
-                href="https://instagram.com" 
+                href={BUSINESS_CONFIG.instagramUrl} 
                 target="_blank" 
                 rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center text-stone-300 hover:bg-henna-700 hover:text-white transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-800 text-stone-300 hover:bg-henna-700 hover:text-white transition-colors text-xs font-medium"
                 aria-label="Instagram"
               >
-                <Instagram className="w-4 h-4" />
-              </a>
-              <a 
-                href="https://facebook.com" 
-                target="_blank" 
-                rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center text-stone-300 hover:bg-henna-700 hover:text-white transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook className="w-4 h-4" />
+                <Instagram className="w-4 h-4 text-pink-400" />
+                <span>{BUSINESS_CONFIG.instagram}</span>
               </a>
             </div>
           </div>
@@ -105,7 +97,7 @@ export default function Footer() {
             <ul className="space-y-3 text-sm text-stone-300">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-henna-400 mt-1 shrink-0" />
-                <span>{isTelugu ? 'డోర్‌స్టెప్ సేవలు అందుబాటులో ఉన్నాయి, హైదరాబాద్ & పరిసర ప్రాంతాలు' : 'Doorstep Services Available in ' + BUSINESS_CONFIG.location}</span>
+                <span>{isTelugu ? 'డోర్‌స్టెప్ సేవలు అందుబాటులో ఉన్నాయి, విశాఖపట్నం & పరిసర ప్రాంతాలు' : 'Doorstep Services Available in ' + BUSINESS_CONFIG.location}</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -117,6 +109,12 @@ export default function Footer() {
                 <Mail className="w-4 h-4 text-gold-400 shrink-0" />
                 <a href={`mailto:${BUSINESS_CONFIG.email}`} className="hover:text-white transition-colors">
                   {BUSINESS_CONFIG.email}
+                </a>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
+                <a href={BUSINESS_CONFIG.instagramUrl} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
+                  {BUSINESS_CONFIG.instagram}
                 </a>
               </li>
               <li className="pt-2">
